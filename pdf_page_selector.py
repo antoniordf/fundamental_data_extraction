@@ -12,6 +12,7 @@ from selector.constants import DEFAULT_SEARCH_WINDOW, DEFAULT_TOC_DELTA
 from selector.exceptions import ExtractionError, OutputError, SelectorError
 from selector.extractor import PDFTextExtractor
 from selector.models import StatementType
+from selector.planner import plan_minimal_filings
 from selector.selector import FinancialStatementSelector
 
 DEFAULT_INPUT_DIR = Path("input_pdfs")
@@ -52,6 +53,23 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Range of pages around the TOC hint to inspect when the index is unavailable",
+    )
+    parser.add_argument(
+        "--plan-latest",
+        dest="plan_latest",
+        help="Latest available filing period (e.g. FY2024, Q1 2026) for coverage planning",
+    )
+    parser.add_argument(
+        "--plan-years",
+        dest="plan_years",
+        type=int,
+        default=None,
+        help="Number of fiscal years to cover when planning the minimal filing set",
+    )
+    parser.add_argument(
+        "--plan-json",
+        action="store_true",
+        help="Emit plan output as JSON instead of a simple filing list",
     )
     parser.add_argument(
         "--all",
@@ -137,6 +155,29 @@ def main(argv: List[str] | None = None) -> int:
         parser.error("Specify either an explicit output PDF path or --output-dir, not both.")
     if args.all and args.output_pdf:
         parser.error("--all cannot be combined with an explicit output PDF path.")
+
+    if args.plan_latest:
+        if args.auto_ocr or args.all or args.input_pdf or args.scan_dir or args.output_pdf:
+            parser.error("Planning mode cannot be combined with extraction options.")
+        plan_years = args.plan_years or 10
+        plan = plan_minimal_filings(args.plan_latest, plan_years)
+        if args.plan_json:
+            print(json.dumps(plan.to_json(), indent=2))
+        else:
+            sorted_filings = sorted(
+                plan.filings,
+                key=lambda f: (
+                    0 if f.filing_type == "10-K" else 1,
+                    -f.year,
+                    f.quarter or 0,
+                ),
+            )
+            for filing in sorted_filings:
+                label = f"{filing.filing_type} {filing.year}"
+                if filing.quarter is not None:
+                    label += f" Q{filing.quarter}"
+                print(label)
+        return 0
 
     try:
         input_paths = resolve_input_paths(args)

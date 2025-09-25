@@ -42,6 +42,22 @@ Place the filings you wish to process inside `input_pdfs/` and run:
 - Outputs are written to `output_pdfs/` by default. Use `--output-dir /path/to/out` to override.
 - Failures for individual filings are reported but do not halt the batch; the final JSON includes an `errors` array alongside `results` when any issues occur.
 
+### Planning Minimal Filing Sets
+
+Estimate the smallest collection of 10-K and 10-Q filings required to rebuild `n` years of quarterly and annual history (accounting for overlapping coverage of prior periods):
+
+```bash
+./myenv/bin/python pdf_page_selector.py --plan-latest "Q1 2026" --plan-years 10
+```
+
+Acceptable `--plan-latest` formats include `FY2024`, `FY-2024`, `Q3 2025`, and `2025Q3`. Planning mode emits a JSON plan listing the required quarters, fiscal years, and the minimal filings that cover them; it runs independently of extraction flags.
+
+Assumptions baked into the planner:
+
+- Each 10-K supplies income statement & cash-flow history for the current fiscal year plus the prior two, and balance sheet snapshots for the current and immediately preceding year-end.
+- A Q2 10-Q provides enough data (quarter and year-to-date columns) to reconstruct Q1 and Q2 for the current and prior fiscal year; a Q3 10-Q provides Q3 for the current and prior fiscal year.
+- Only the most recent Q1 filing is required when the latest period is Q1; older Q1s are inferred from later Q2 filings.
+
 ### Additional Options
 
 - `--input-dir DIR`: base directory to search for PDFs when `--all` or no explicit file is supplied.
