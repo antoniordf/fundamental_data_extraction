@@ -140,46 +140,58 @@ def main(argv: List[str] | None = None) -> int:
 
     try:
         input_paths = resolve_input_paths(args)
-        input_is_dir = bool(args.input_pdf and Path(args.input_pdf).is_dir())
-        batch_mode = len(input_paths) > 1 or args.all or input_is_dir
-
-        extractor = PDFTextExtractor(enable_ocr=args.auto_ocr)
-        selector = FinancialStatementSelector(
-            extractor,
-            search_window=args.search_window or DEFAULT_SEARCH_WINDOW,
-            toc_delta=args.toc_delta or DEFAULT_TOC_DELTA,
-        )
-
-        output_dir_path: Path | None = None
-        if batch_mode:
-            output_dir_path = Path(args.output_dir) if args.output_dir else DEFAULT_OUTPUT_DIR
-            output_dir_path.mkdir(parents=True, exist_ok=True)
-
-        outputs: List[Dict[str, object]] = []
-        for input_path in input_paths:
-            if batch_mode:
-                assert output_dir_path is not None
-                output_path = output_dir_path / f"{input_path.stem} - FS only (robust).pdf"
-            else:
-                output_path = resolve_output_path(input_path, args)
-
-            result = selector.run(input_path, output_pdf=output_path)
-
-            metadata = serialize_metadata(result.metadata)
-            metadata.setdefault("selected_pages", {})
-            metadata["selected_pages"] = {
-                stype.value: result.selected_pages.get(stype, []) for stype in StatementType
-            }
-            outputs.append(metadata)
-
-        if len(outputs) == 1:
-            print(json.dumps(outputs[0], indent=2))
-        else:
-            print(json.dumps(outputs, indent=2))
-        return 0
     except (ExtractionError, OutputError, SelectorError) as exc:
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
         return 1
+
+    input_is_dir = bool(args.input_pdf and Path(args.input_pdf).is_dir())
+    batch_mode = len(input_paths) > 1 or args.all or input_is_dir
+
+    extractor = PDFTextExtractor(enable_ocr=args.auto_ocr)
+    selector = FinancialStatementSelector(
+        extractor,
+        search_window=args.search_window or DEFAULT_SEARCH_WINDOW,
+        toc_delta=args.toc_delta or DEFAULT_TOC_DELTA,
+    )
+
+    output_dir_path: Path | None = None
+    if batch_mode:
+        output_dir_path = Path(args.output_dir) if args.output_dir else DEFAULT_OUTPUT_DIR
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+
+    outputs: List[Dict[str, object]] = []
+    errors: List[Dict[str, object]] = []
+
+    for input_path in input_paths:
+        if batch_mode:
+            assert output_dir_path is not None
+            output_path = output_dir_path / f"{input_path.stem} - FS only (robust).pdf"
+        else:
+            output_path = resolve_output_path(input_path, args)
+
+        try:
+            result = selector.run(input_path, output_pdf=output_path)
+        except (ExtractionError, OutputError, SelectorError) as exc:
+            errors.append({"file": str(input_path), "error": str(exc)})
+            continue
+
+        metadata = serialize_metadata(result.metadata)
+        metadata.setdefault("selected_pages", {})
+        metadata["selected_pages"] = {
+            stype.value: result.selected_pages.get(stype, []) for stype in StatementType
+        }
+        outputs.append(metadata)
+
+    if errors or len(outputs) != 1 or batch_mode:
+        payload: Dict[str, object] = {"results": outputs}
+        if errors:
+            payload["errors"] = errors
+        print(json.dumps(payload, indent=2))
+        return 1 if errors else 0
+
+    # single successful run
+    print(json.dumps(outputs[0], indent=2))
+    return 0
 
 
 if __name__ == "__main__":

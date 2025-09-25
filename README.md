@@ -40,6 +40,7 @@ Place the filings you wish to process inside `input_pdfs/` and run:
 
 - Every `*.pdf` under `input_pdfs/` (recursively) is processed.
 - Outputs are written to `output_pdfs/` by default. Use `--output-dir /path/to/out` to override.
+- Failures for individual filings are reported but do not halt the batch; the final JSON includes an `errors` array alongside `results` when any issues occur.
 
 ### Additional Options
 

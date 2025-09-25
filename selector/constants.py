@@ -4,17 +4,17 @@ from __future__ import annotations
 import re
 
 OPS_HEAD = re.compile(
-    r"(consolidated\s+)?statements?\s*[\W_]*\s*of\s*[\W_]*\s*"
+    r"(condensed\s+)?(consolidated\s+)?statements?\s*[\W_]*\s*of\s*[\W_]*\s*"
     r"(operations|income|earnings)(?!.*comprehensive)",
     re.I,
 )
 BAL_HEAD = re.compile(
-    r"(consolidated\s+)?balance\s*[\W_]*\s*sheets?"
+    r"(condensed\s+)?(consolidated\s+)?balance\s*[\W_]*\s*sheets?"
     r"|statements?\s*[\W_]*\s*of\s*[\W_]*\s*financial\s*[\W_]*\s*position",
     re.I,
 )
 CF_HEAD = re.compile(
-    r"(consolidated\s+)?statements?\s*[\W_]*\s*of\s*[\W_]*\s*cash\s*[\W_]*\s*flows?",
+    r"(condensed\s+)?(consolidated\s+)?statements?\s*[\W_]*\s*of\s*[\W_]*\s*cash\s*[\W_]*\s*flows?",
     re.I,
 )
 EXCLUDE = re.compile(r"\bItem\s+7A\b.*Market\s+Risk\b", re.I)
@@ -78,6 +78,6 @@ DEFAULT_TOC_DELTA = 6
 DEFAULT_LOW_TEXT_THRESHOLD = 2000
 DEFAULT_LOW_TEXT_SAMPLE = 8
 
-MAX_STATEMENT_EXTENSION_PAGES = 4
+MAX_STATEMENT_EXTENSION_PAGES = 2
 MIN_CONTINUATION_DENSITY = 12
 CONTINUATION_ANCHOR_BONUS = 1

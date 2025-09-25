@@ -73,6 +73,18 @@ def has_anchors(text: str, anchors: Sequence[str], min_hits: int = 3) -> bool:
     return sum(1 for anchor in anchors if anchor in lowered) >= min_hits
 
 
+def heading_line_present(text: str, heading_pat, max_lines: int = 6) -> bool:
+    lines = text.split("\n")[:max_lines]
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = heading_pat.search(stripped)
+        if match and match.start() == 0:
+            return True
+    return False
+
+
 def write_subset(src: Path, idxs: Iterable[int], out_path: Path) -> None:
     reader = PdfReader(str(src))
     writer = PdfWriter()
@@ -177,16 +189,13 @@ def include_continuations(
             break
         if continuation_limits(text, heading_pat):
             break
-        if CONTINUED.search(text) or heading_pat.search(text):
-            if numeric_density(text) >= 4:
-                pages.append(idx)
-                idx += 1
-                extensions += 1
-                continue
-        if numeric_density(text) >= MIN_CONTINUATION_DENSITY and has_anchors(
+        if (
+            CONTINUED.search(text)
+            or heading_line_present(text, heading_pat)
+        ) and numeric_density(text) >= 4 and has_anchors(
             text,
             anchors,
-            min_hits=max(1, anchor_min - CONTINUATION_ANCHOR_BONUS),
+            min_hits=max(2, anchor_min - CONTINUATION_ANCHOR_BONUS),
         ):
             pages.append(idx)
             idx += 1

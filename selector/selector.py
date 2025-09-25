@@ -21,6 +21,7 @@ from .utils import (
     dedup_order,
     has_anchors,
     include_continuations,
+    heading_line_present,
     near_top,
     numeric_density,
     write_subset,
@@ -289,6 +290,8 @@ class FinancialStatementSelector:
         if INDEX_PAGE.search(text):
             return False
         if not near_top(text, heading):
+            return False
+        if not heading_line_present(text, heading):
             return False
         if not has_anchors(text, anchors, min_hits=anchor_min):
             return False
