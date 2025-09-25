@@ -53,6 +53,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default=None,
         help="Range of pages around the TOC hint to inspect when the index is unavailable",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Process every PDF found under the resolved input directory",
+    )
     return parser
 
 
@@ -73,6 +78,31 @@ def resolve_input_path(args: argparse.Namespace) -> Path:
     if not found_pdf:
         raise SelectorError(f"No PDF files found in directory: {search_dir}")
     return found_pdf
+
+
+def resolve_input_paths(args: argparse.Namespace) -> List[Path]:
+    if args.input_pdf:
+        input_path = Path(args.input_pdf)
+        if input_path.is_dir():
+            pdfs = sorted(input_path.rglob("*.pdf"))
+            if not pdfs:
+                raise SelectorError(f"No PDF files found in directory: {input_path}")
+            return pdfs
+        return [input_path]
+
+    if args.all or args.input_dir or args.scan_dir:
+        base_dir = Path(args.input_dir or args.scan_dir or DEFAULT_INPUT_DIR)
+        if not base_dir.exists():
+            if base_dir == DEFAULT_INPUT_DIR and not (args.input_dir or args.scan_dir):
+                base_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                raise SelectorError(f"Input directory does not exist: {base_dir}")
+        pdfs = sorted(base_dir.rglob("*.pdf"))
+        if not pdfs:
+            raise SelectorError(f"No PDF files found in directory: {base_dir}")
+        return pdfs
+
+    return [resolve_input_path(args)]
 
 
 def resolve_output_path(input_path: Path, args: argparse.Namespace) -> Path:
@@ -105,10 +135,13 @@ def main(argv: List[str] | None = None) -> int:
 
     if args.output_dir and args.output_pdf:
         parser.error("Specify either an explicit output PDF path or --output-dir, not both.")
+    if args.all and args.output_pdf:
+        parser.error("--all cannot be combined with an explicit output PDF path.")
 
     try:
-        input_path = resolve_input_path(args)
-        output_path = resolve_output_path(input_path, args)
+        input_paths = resolve_input_paths(args)
+        input_is_dir = bool(args.input_pdf and Path(args.input_pdf).is_dir())
+        batch_mode = len(input_paths) > 1 or args.all or input_is_dir
 
         extractor = PDFTextExtractor(enable_ocr=args.auto_ocr)
         selector = FinancialStatementSelector(
@@ -116,14 +149,33 @@ def main(argv: List[str] | None = None) -> int:
             search_window=args.search_window or DEFAULT_SEARCH_WINDOW,
             toc_delta=args.toc_delta or DEFAULT_TOC_DELTA,
         )
-        result = selector.run(input_path, output_pdf=output_path)
 
-        metadata = serialize_metadata(result.metadata)
-        metadata.setdefault("selected_pages", {})
-        metadata["selected_pages"] = {
-            stype.value: result.selected_pages.get(stype, []) for stype in StatementType
-        }
-        print(json.dumps(metadata, indent=2))
+        output_dir_path: Path | None = None
+        if batch_mode:
+            output_dir_path = Path(args.output_dir) if args.output_dir else DEFAULT_OUTPUT_DIR
+            output_dir_path.mkdir(parents=True, exist_ok=True)
+
+        outputs: List[Dict[str, object]] = []
+        for input_path in input_paths:
+            if batch_mode:
+                assert output_dir_path is not None
+                output_path = output_dir_path / f"{input_path.stem} - FS only (robust).pdf"
+            else:
+                output_path = resolve_output_path(input_path, args)
+
+            result = selector.run(input_path, output_pdf=output_path)
+
+            metadata = serialize_metadata(result.metadata)
+            metadata.setdefault("selected_pages", {})
+            metadata["selected_pages"] = {
+                stype.value: result.selected_pages.get(stype, []) for stype in StatementType
+            }
+            outputs.append(metadata)
+
+        if len(outputs) == 1:
+            print(json.dumps(outputs[0], indent=2))
+        else:
+            print(json.dumps(outputs, indent=2))
         return 0
     except (ExtractionError, OutputError, SelectorError) as exc:
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
