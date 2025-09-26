@@ -13,10 +13,14 @@ Utility for extracting the balance sheet, income statement, and cash-flow pages 
 ## Repository Layout
 
 ```
-pdf_page_selector.py   # CLI entry point
-selector/              # Library package (extractor, heuristics, utils)
+pdf_page_selector.py   # CLI entry point for PDF reduction
+carbon_copy_extractor.py
+                      # CLI entry point for Excel carbon copy outputs
+selector/              # Library package (selector heuristics)
+carbon_copy/           # Carbon-copy Excel builder (parsing, normalization, certification)
 input_pdfs/            # Default source directory for batch runs
 output_pdfs/           # Default destination for generated PDFs
+carbon_copy_excels/    # Default destination for generated Excel workbooks
 ```
 
 ## Usage
@@ -64,6 +68,29 @@ Assumptions baked into the planner:
 - `--output-pdf FILE`: explicit output path (only valid for single-file mode).
 - `--search-window N`: tweak the window used when mapping printed index numbers to actual page indices.
 - `--toc-delta N`: adjust the number of pages scanned around a Table-of-Contents hint.
+
+## Carbon Copy Extraction to Excel
+
+Once the financial-statement pages have been isolated (step 1), run the carbon copy extractor to mirror the statements in Excel (step 2):
+
+```bash
+./myenv/bin/python carbon_copy_extractor.py 'output_pdfs/filing - FS only (robust).pdf'
+```
+
+- The PDF is positional; quotes only matter when the filename includes spaces/parentheses.
+- Output defaults to `carbon_copy_excels/<pdf-stem>_carbon_copy.xlsx`. Override with `--output path/to/file.xlsx`.
+- `--demo` writes a curated EA FY2025 example workbook without reading a PDF.
+- Tuning knobs match pdfplumber’s tolerances (`--snap-tol`, `--text-tol`, `--intersection-tol`).
+
+### Excel Workbook Structure
+
+Each workbook contains:
+
+- `WIDE_Income`, `WIDE_BalanceSheet`, `WIDE_CashFlows`: verbatim statements with line-item order preserved, monetary figures normalized to USD millions, and columns reordered oldest → newest.
+- `LONG_All`: a denormalized table (one row per statement/period pair) for downstream analytics.
+- `Certification`: automated checks (balance sheet equality, cash roll-through, net income link, cross-footing, coverage, units) with pass/variance details.
+
+Behind the scenes, the `carbon_copy` package handles PDF parsing, monetary-unit detection, sign normalization, and certification logic; it is designed to operate on any company’s statements produced by `pdf_page_selector.py`.
 
 ## Programmatic Use
 
