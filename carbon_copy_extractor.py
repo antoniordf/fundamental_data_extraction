@@ -22,23 +22,28 @@ def build_parser() -> argparse.ArgumentParser:
             "from a PDF produced by pdf_page_selector."
         )
     )
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument(
+    parser.add_argument(
         "--demo",
         action="store_true",
         help="Write the curated demo workbook (EA FY2025) without reading a PDF.",
     )
-    mode.add_argument(
+    parser.add_argument(
         "--pdf",
+        dest="pdf_flag",
         type=Path,
         metavar="PATH",
+        help="Input PDF containing the three statements (legacy flag; positional argument preferred).",
+    )
+    parser.add_argument(
+        "pdf",
+        nargs="?",
+        type=Path,
         help="Input PDF containing the three statements (e.g., output from pdf_page_selector).",
     )
     parser.add_argument(
         "--output",
-        required=True,
         type=Path,
-        help="Destination Excel file (*.xlsx).",
+        help="Destination Excel file (*.xlsx). If omitted, defaults to carbon_copy_excels/<pdf-stem>_carbon_copy.xlsx.",
     )
     parser.add_argument(
         "--snap-tol",
@@ -66,20 +71,30 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        if args.pdf_flag and args.pdf and args.pdf_flag != args.pdf:
+            parser.error("Provide the PDF only once (positional or --pdf, not both).")
+        pdf_path = args.pdf or args.pdf_flag
         if args.demo:
+            if pdf_path is not None:
+                parser.error("Do not supply a PDF when using --demo.")
             result = build_demo_result()
+            default_output = Path("carbon_copy_excels/demo_carbon_copy.xlsx")
         else:
+            if pdf_path is None:
+                parser.error("Provide a PDF path (positional argument) or use --demo.")
             config = ExtractionConfig(
                 snap_tolerance=args.snap_tol,
                 text_tolerance=args.text_tol,
                 intersection_tolerance=args.intersection_tol,
             )
             extractor = CarbonCopyExtractor(config)
-            result = extractor.extract(args.pdf)
+            result = extractor.extract(pdf_path)
+            default_output = Path("carbon_copy_excels") / f"{pdf_path.stem}_carbon_copy.xlsx"
 
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        write_excel_workbook(result, args.output)
-        print(f"Wrote workbook to {args.output}")
+        output_path = args.output or default_output
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        write_excel_workbook(result, output_path)
+        print(f"Wrote workbook to {output_path}")
         return 0
     except CarbonCopyError as exc:
         print(f"Carbon copy extraction failed: {exc}", file=sys.stderr)
