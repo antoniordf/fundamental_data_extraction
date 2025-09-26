@@ -31,6 +31,19 @@ def assemble_long(statement: StatementType, header: dict[str, str], wide: pd.Dat
     for _, row in wide.iterrows():
         for period in period_cols:
             value = row[period]
+            processed_value = None
+            if not pd.isna(value):
+                if isinstance(value, str):
+                    cleaned = value.replace(",", "").strip()
+                    if cleaned.startswith("(") and cleaned.endswith(")"):
+                        cleaned = f"-{cleaned[1:-1]}"
+                    try:
+                        processed_value = float(cleaned)
+                    except ValueError:
+                        processed_value = None
+                else:
+                    processed_value = float(value)
+
             payload.append(
                 {
                     "Statement": header["Statement Name"],
@@ -38,7 +51,7 @@ def assemble_long(statement: StatementType, header: dict[str, str], wide: pd.Dat
                     "Level": row["Level"],
                     "Line Item (as printed)": row["Line Item (as printed)"],
                     "Column Header (as printed)": period,
-                    "Value (in millions)": None if pd.isna(value) else float(value),
+                    "Value (in millions)": processed_value,
                     "Original Units": header["Original Units"],
                     "Saved Units": header["Saved Units"],
                     "Units Assumption": header.get("Units Assumption", ""),

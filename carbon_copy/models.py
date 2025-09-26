@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -36,6 +36,7 @@ class StatementBlock:
     statement_type: StatementType
     header: HeaderInfo
     wide_table: pd.DataFrame
+    column_metadata: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
     @property
     def name(self) -> str:

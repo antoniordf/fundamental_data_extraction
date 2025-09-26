@@ -8,3 +8,4 @@ __pycache__/
 # Extraction artifacts
 input_pdfs/
 output_pdfs/
+carbon_copy_excels/
