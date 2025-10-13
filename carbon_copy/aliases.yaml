@@ -1,0 +1,86 @@
+# Canonical label aliases for financial statements.
+# Add or adjust entries as new label variants appear across filings.
+income:
+  revenues: Net revenue
+  total revenues: Net revenue
+  net revenues: Net revenue
+  net revenue: Net revenue
+  total net revenue: Net revenue
+  cost of revenues: Cost of revenue
+  cost of goods sold: Cost of revenue
+  research and development: Research and development
+  selling and marketing: Marketing and sales
+  selling and administrative: Marketing and sales
+  general and administrative: General and administrative
+  earnings per share: Earnings per share:
+  basic earnings per share: Basic
+  diluted earnings per share: Diluted
+  income before taxes and equity in earnings of unconsolidated affiliate: Income before income taxes and equity in earnings of unconsolidated affiliate
+  income before taxes and equity in earnings of: Income before income taxes and equity in earnings of unconsolidated affiliate
+  income before taxes: Income before income taxes
+  income before income taxes: Income before income taxes
+  income (loss) before taxes: Income before income taxes
+  income before taxes and equity in earnings: Income before income taxes
+  income (loss) before taxes and equity in earnings of unconsolidated affiliate: Income before income taxes
+  income before income taxes and equity in earnings of unconsolidated affiliate: Income before income taxes
+  income before equity in earnings of unconsolidated: Income before equity in earnings of unconsolidated affiliate
+  income (loss) before equity in earnings of unconsolidated affiliate: Income before equity in earnings of unconsolidated affiliate
+  income before equity in earnings of unconsolidated affiliate: Income before equity in earnings of unconsolidated affiliate
+  income (loss): Net income
+  net income (loss): Net income
+  net loss (income): Net income
+  net (income): Net income
+  income tax expense (benefit): Income tax expense
+  total other expense, net: Total other (income) expense, net
+  total other income (expense), net: Total other (income) expense, net
+  net income (loss) attributable to non-controlling interests: Net income attributable to non-controlling interests
+  net income attributable to amkor: Net income attributable to Amkor
+  net income attributable to amkor per common share: Net income attributable to Amkor per common share
+  net income attributable to amkor per common: Net income attributable to Amkor per common share
+  net income attributable to amkor per common share: Net income attributable to Amkor per common share
+  net income (loss) attributable to amkor per common share: Net income attributable to Amkor per common share
+  net income (loss) attributable to amkor per common share:: Net income attributable to Amkor per common share
+  net income attributable to noncontrolling interests: Net income attributable to non-controlling interests
+  net income attributable to non-controlling interests: Net income attributable to non-controlling interests
+balance:
+  total assets: TOTAL ASSETS
+  total liabilities: Total liabilities
+  total stockholders' equity: Total stockholders’ equity
+  total shareholders' equity: Total stockholders’ equity
+  retained earnings: Retained earnings
+  accumulated other comprehensive income (loss): Accumulated other comprehensive income (loss)
+  accounts receivable, net of allowances: Accounts receivable, net of allowances
+  accounts receivable, net of allowances of: Accounts receivable, net of allowances
+  long-term operating lease liability: Long-term operating lease liabilities
+  noncontrolling interests in subsidiaries: Non-controlling interests in subsidiaries
+  non-controlling interests in subsidiaries: Non-controlling interests in subsidiaries
+  operating lease right of use asset: Operating lease right-of-use assets
+  operating lease right of use assets: Operating lease right-of-use assets
+  amkor stockholders’ equity: Total stockholders’ equity
+  total equity: Total stockholders’ equity
+  treasury stock, at cost: Treasury stock, at cost
+cash:
+  net cash provided by operating activities: Net cash provided by operating activities
+  net cash provided by (used in) operating activities: Net cash provided by operating activities
+  net cash used in investing activities: Net cash provided by (used in) investing activities
+  net cash used in financing activities: Net cash used in financing activities
+  cash and cash equivalents, beginning of period: Beginning cash and cash equivalents
+  cash and cash equivalents, end of period: Ending cash and cash equivalents
+  net cash (used in) provided by financing activities: Net cash provided by (used in) financing activities
+  net cash provided by (used in) financing activities: Net cash provided by (used in) financing activities
+  net cash provided by financing activities: Net cash provided by (used in) financing activities
+  net decrease in cash and cash equivalents: Net increase (decrease) in cash and cash equivalents
+  net decrease in cash, cash equivalents and restricted cash: Net increase (decrease) in cash, cash equivalents and restricted cash
+  net increase (decrease): Net increase (decrease) in cash and cash equivalents
+  net increase in cash, cash equivalents and restricted cash: Net increase (decrease) in cash, cash equivalents and restricted cash
+  net increase (decrease) in cash, cash equivalents and restricted cash: Net increase (decrease) in cash, cash equivalents and restricted cash
+  net increase (decrease) in cash and cash equivalents: Net increase (decrease) in cash, cash equivalents and restricted cash
+  effect of exchange rate fluctuations on cash and cash equivalents: Effect of exchange rate fluctuations on cash, cash equivalents and restricted cash
+  effect of exchange rate fluctuations on cash, cash equivalents and restricted cash: Effect of exchange rate fluctuations on cash, cash equivalents and restricted cash
+  non cash investing and financing activities: Non-cash investing and financing activities
+  non-cash investing and financing activities: Non-cash investing and financing activities
+  proceeds from long-term debt: Proceeds from issuance of long-term debt
+  proceeds from the issuance of stock through share-based compensation plans: Proceeds from issuance of stock through share-based compensation plans
+  proceeds from issuance of stock through share-based compensation plans: Proceeds from issuance of stock through share-based compensation plans
+  payments for the retirement of debt: Payments for retirement of debt
+  payments for retirement of debt: Payments for retirement of debt

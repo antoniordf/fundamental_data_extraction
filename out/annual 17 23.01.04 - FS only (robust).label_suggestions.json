@@ -1,0 +1,24 @@
+{
+  "pdf": "/Users/antoniofurtado/Desktop/Trading/scripts/data_extraction/output_pdfs/annual 17 23.01.04 - FS only (robust).pdf",
+  "dry_run": true,
+  "min_confidence": 0.0,
+  "total_suggestions": 2,
+  "applied_suggestions": 0,
+  "applied_indices": [],
+  "suggestions": [
+    {
+      "statement": "cash",
+      "row_index": 12,
+      "normalized_label": "Proceeds from insurance recovery for property, plant and equipment",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "cash",
+      "row_index": 27,
+      "normalized_label": "Proceeds from insurance recovery for property, plant and equipment",
+      "justification": "dry_run",
+      "confidence": null
+    }
+  ]
+}

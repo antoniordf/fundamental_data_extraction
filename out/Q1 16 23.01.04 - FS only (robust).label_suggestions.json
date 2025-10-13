@@ -1,0 +1,45 @@
+{
+  "pdf": "/Users/antoniofurtado/Desktop/Trading/scripts/data_extraction/output_pdfs/Q1 16 23.01.04 - FS only (robust).pdf",
+  "dry_run": true,
+  "min_confidence": 0.0,
+  "total_suggestions": 5,
+  "applied_suggestions": 0,
+  "applied_indices": [],
+  "suggestions": [
+    {
+      "statement": "balance",
+      "row_index": 27,
+      "normalized_label": "issued, and shares outstanding",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 3,
+      "normalized_label": "Restricted cash",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 10,
+      "normalized_label": "Restricted cash",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 20,
+      "normalized_label": "Long-term debt",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 21,
+      "normalized_label": "Long-term debt",
+      "justification": "dry_run",
+      "confidence": null
+    }
+  ]
+}

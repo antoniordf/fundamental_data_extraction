@@ -76,6 +76,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Process every PDF found under the resolved input directory",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Regenerate output PDFs even when an existing extraction is present",
+    )
     return parser
 
 
@@ -209,6 +214,17 @@ def main(argv: List[str] | None = None) -> int:
             output_path = output_dir_path / f"{input_path.stem} - FS only (robust).pdf"
         else:
             output_path = resolve_output_path(input_path, args)
+
+        if output_path.exists() and not args.overwrite:
+            outputs.append(
+                {
+                    "file": input_path.name,
+                    "output_pdf": str(output_path),
+                    "status": "skipped_existing",
+                    "detail": "Output already exists; rerun with --overwrite to regenerate.",
+                }
+            )
+            continue
 
         try:
             result = selector.run(input_path, output_pdf=output_path)

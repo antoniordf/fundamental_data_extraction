@@ -1,0 +1,52 @@
+{
+  "pdf": "/Users/antoniofurtado/Desktop/Trading/scripts/data_extraction/output_pdfs/amkr-20220630 Q2 22 - FS only (robust).pdf",
+  "dry_run": true,
+  "min_confidence": 0.0,
+  "total_suggestions": 6,
+  "applied_suggestions": 0,
+  "applied_indices": [],
+  "suggestions": [
+    {
+      "statement": "income",
+      "row_index": 14,
+      "normalized_label": "Net income attributable to Amkor",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "income",
+      "row_index": 15,
+      "normalized_label": "Net income attributable to Amkor",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "income",
+      "row_index": 18,
+      "normalized_label": "Shares used in computing per common share",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 30,
+      "normalized_label": "issued; and shares outstanding",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 3,
+      "normalized_label": "Restricted cash",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 12,
+      "normalized_label": "Restricted cash",
+      "justification": "dry_run",
+      "confidence": null
+    }
+  ]
+}

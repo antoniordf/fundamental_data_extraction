@@ -19,6 +19,7 @@ SAVED_UNITS_LABEL = "USD millions (normalized)"
 
 NON_MONETARY_KEYWORDS = (
     "per share",
+    "per common share",
     "earnings per share",
     "weighted-average shares",
     "shares outstanding",

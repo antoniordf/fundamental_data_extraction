@@ -1,0 +1,31 @@
+{
+  "pdf": "/Users/antoniofurtado/Desktop/Trading/scripts/data_extraction/output_pdfs/Q2 19 23.01.04 - FS only (robust).pdf",
+  "dry_run": true,
+  "min_confidence": 0.0,
+  "total_suggestions": 3,
+  "applied_suggestions": 0,
+  "applied_indices": [],
+  "suggestions": [
+    {
+      "statement": "balance",
+      "row_index": 28,
+      "normalized_label": "issued; and shares outstanding",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 3,
+      "normalized_label": "Restricted cash",
+      "justification": "dry_run",
+      "confidence": null
+    },
+    {
+      "statement": "balance",
+      "row_index": 11,
+      "normalized_label": "Restricted cash",
+      "justification": "dry_run",
+      "confidence": null
+    }
+  ]
+}

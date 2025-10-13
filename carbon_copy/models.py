@@ -10,6 +10,33 @@ from selector.models import StatementType
 
 
 @dataclass(slots=True)
+class SuspectLabel:
+    row_index: int
+    original: str
+    cleaned: str
+    reasons: List[str]
+
+
+@dataclass(slots=True)
+class LabelReviewRequest:
+    statement: StatementType
+    row_index: int
+    cleaned_label: str
+    raw_label: str
+    reasons: List[str]
+    values: Dict[str, Optional[float]]
+
+
+@dataclass(slots=True)
+class LabelSuggestion:
+    statement: StatementType
+    row_index: int
+    normalized_label: str
+    justification: str
+    confidence: Optional[float] = None
+
+
+@dataclass(slots=True)
 class HeaderInfo:
     statement_name: str
     original_units: str
@@ -37,6 +64,7 @@ class StatementBlock:
     header: HeaderInfo
     wide_table: pd.DataFrame
     column_metadata: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    suspect_labels: Dict[int, SuspectLabel] = field(default_factory=dict)
 
     @property
     def name(self) -> str:

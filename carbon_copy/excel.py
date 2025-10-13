@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Dict
 
 import pandas as pd
 
@@ -13,6 +14,12 @@ WIDE_SHEETS = {
     StatementType.INCOME: "WIDE_Income",
     StatementType.BALANCE: "WIDE_BalanceSheet",
     StatementType.CASH: "WIDE_CashFlows",
+}
+
+SERIES_SHEETS = {
+    StatementType.INCOME: "TimeSeries_Income",
+    StatementType.BALANCE: "TimeSeries_BalanceSheet",
+    StatementType.CASH: "TimeSeries_CashFlows",
 }
 
 
@@ -44,3 +51,29 @@ def write_excel_workbook(result: CarbonCopyResult, output_path: Path) -> None:
 
         result.long_table.to_excel(writer, sheet_name="LONG_All", index=False)
         result.certification.to_excel(writer, sheet_name="Certification", index=False)
+
+
+def write_time_series_workbook(
+    tables: Dict[StatementType, pd.DataFrame],
+    diagnostics: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    with pd.ExcelWriter(output_path, engine="xlsxwriter") as writer:
+        for statement in StatementType:
+            sheet_name = SERIES_SHEETS[statement]
+            table = tables.get(statement)
+            if table is None or table.empty:
+                continue
+            table.to_excel(writer, sheet_name=sheet_name, index=False)
+        if diagnostics is not None and not diagnostics.empty:
+            diagnostics.to_excel(writer, sheet_name="Diagnostics", index=False)
+
+
+def write_long_aggregation_workbook(
+    long_table: pd.DataFrame,
+    certification: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    with pd.ExcelWriter(output_path, engine="xlsxwriter") as writer:
+        long_table.to_excel(writer, sheet_name="LONG_All", index=False)
+        certification.to_excel(writer, sheet_name="Certification", index=False)

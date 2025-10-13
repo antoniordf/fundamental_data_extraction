@@ -9,3 +9,6 @@ __pycache__/
 input_pdfs/
 output_pdfs/
 carbon_copy_excels/
+
+# Environment variables
+.env

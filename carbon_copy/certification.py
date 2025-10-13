@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Tuple
+from datetime import date
+from typing import Dict, Iterable, List, Tuple
 
 import pandas as pd
 
 from selector.models import StatementType
 
-from .models import StatementBlock
+from .models import CarbonCopyResult, StatementBlock
+from .aggregation import (
+    infer_months,
+    parse_period_end,
+    format_date,
+    SeriesAggregator,
+    Measurement,
+)
 
 COLS_START = 3
 
@@ -17,6 +25,174 @@ def _pick_row(df: pd.DataFrame, pattern: str) -> pd.Series | None:
     if not mask.any():
         return None
     return df[mask].iloc[0]
+
+
+def _normalize_duration(
+    statement: StatementType,
+    duration: str,
+    months: int | None,
+) -> Tuple[str, int | None]:
+    duration_norm = (duration or "").lower()
+    if statement == StatementType.BALANCE:
+        return ("point", months)
+    if duration_norm in {"quarter", "ytd", "annual"}:
+        return (duration_norm, months)
+    if months == 3:
+        return ("quarter", months)
+    if months in (6, 9):
+        return ("ytd", months)
+    if months == 12:
+        return ("annual", months)
+    return (duration_norm or "unknown", months)
+
+
+def _months_between(a: date, b: date) -> int:
+    return (a.year - b.year) * 12 + (a.month - b.month)
+
+
+def _format_period_label(measure: Measurement) -> str:
+    months = measure.months
+    if measure.duration == "quarter" or months == 3:
+        return f"3M ended {format_date(measure.period_end)}"
+    if measure.duration == "ytd" and months:
+        return f"{months}M ended {format_date(measure.period_end)}"
+    if measure.duration == "annual":
+        return f"FY ended {format_date(measure.period_end)}"
+    return format_date(measure.period_end)
+
+
+def _collect_measurements(
+    results: Iterable[CarbonCopyResult],
+    statement: StatementType,
+    pattern: str,
+) -> List[Measurement]:
+    measurements: List[Measurement] = []
+    for result in results:
+        block = result.blocks[statement]
+        row = _pick_row(block.wide_table, pattern)
+        if row is None:
+            continue
+        for column in block.wide_table.columns[COLS_START:]:
+            meta = block.column_metadata.get(column) or {}
+            period_end = parse_period_end(
+                meta.get("period_end") or column or meta.get("raw_label", "")
+            )
+            if period_end is None or period_end.year < 1900:
+                continue
+            duration = (meta.get("duration") or "").lower()
+            months = infer_months(meta.get("raw_label", ""), duration)
+            duration_norm, months_norm = _normalize_duration(statement, duration, months)
+            value = _value(row, column)
+            if value is None:
+                continue
+            measurements.append(
+                Measurement(
+                    period_end=period_end,
+                    duration=duration_norm,
+                    months=months_norm,
+                    value=value,
+                    source_pdf=result.source_pdf,
+                )
+            )
+    return measurements
+
+
+def _build_measurement_map(measurements: List[Measurement]) -> Dict[date, Dict[str, Measurement]]:
+    data: Dict[date, Dict[str, Measurement]] = {}
+    for meas in measurements:
+        bucket = data.setdefault(meas.period_end, {})
+        existing = bucket.get(meas.duration)
+        if existing is None or existing.source_pdf <= meas.source_pdf:
+            bucket[meas.duration] = meas
+    return data
+
+
+def _derive_quarter_values(data: Dict[date, Dict[str, Measurement]]) -> None:
+    ytd_entries: List[Measurement] = []
+    for period_end, durations in data.items():
+        for meas in durations.values():
+            if meas.duration == "ytd" and meas.months:
+                ytd_entries.append(meas)
+    ytd_entries.sort(key=lambda m: (m.period_end, m.months or 0))
+    for current in ytd_entries:
+        prev_months = (current.months or 0) - 3
+        if prev_months <= 0:
+            continue
+        candidates = [
+            other
+            for other in ytd_entries
+            if other.period_end < current.period_end and (other.months or 0) == prev_months
+        ]
+        if not candidates:
+            continue
+        # choose the closest prior period
+        prev = max(
+            (c for c in candidates if _months_between(current.period_end, c.period_end) == 3),
+            default=None,
+            key=lambda c: c.period_end,
+        )
+        if prev is None:
+            continue
+        derived_value = current.value - prev.value
+        period_bucket = data.setdefault(current.period_end, {})
+        if "quarter" in period_bucket:
+            continue
+        period_bucket["quarter"] = Measurement(
+            period_end=current.period_end,
+            duration="quarter",
+            months=3,
+            value=derived_value,
+            source_pdf=current.source_pdf,
+            derived=True,
+        )
+
+
+def _aggregate_net_income(results: List[CarbonCopyResult]) -> Tuple[str, str]:
+    income_measurements = _collect_measurements(results, StatementType.INCOME, r"^net income")
+    cash_measurements = _collect_measurements(results, StatementType.CASH, r"^net income")
+
+    income_map = _build_measurement_map(income_measurements)
+    cash_map = _build_measurement_map(cash_measurements)
+    _derive_quarter_values(income_map)
+    _derive_quarter_values(cash_map)
+
+    all_periods = sorted(set(income_map.keys()) | set(cash_map.keys()))
+    details: List[str] = []
+    all_pass = True
+    for period_end in all_periods:
+        income_period = income_map.get(period_end, {})
+        cash_period = cash_map.get(period_end, {})
+        shared_durations = set(income_period.keys()) & set(cash_period.keys())
+        if not shared_durations:
+            details.append(f"{format_date(period_end)}: insufficient overlapping data")
+            all_pass = False
+            continue
+        for duration in sorted(shared_durations):
+            inc = income_period[duration]
+            cf = cash_period[duration]
+            delta = inc.value - cf.value
+            if abs(delta) > 1e-6:
+                all_pass = False
+            label = _format_period_label(inc)
+            details.append(f"{label}: Δ {delta:.6g}")
+    status = "PASS" if all_pass else "CHECK"
+    return status, "; ".join(details) if details else "No overlapping periods"
+
+
+def build_batch_certification(results: List[CarbonCopyResult]) -> pd.DataFrame:
+    if not results:
+        return pd.DataFrame(columns=["Source PDF", "Check", "Result", "Details"])
+    status, detail = _aggregate_net_income(results)
+    return pd.DataFrame(
+        [
+            {
+                "Source PDF": "Batch",
+                "Check": "Aggregate net income link (IS vs CF)",
+                "Result": status,
+                "Details": detail,
+            }
+        ]
+    )
 
 
 def _value(series: pd.Series | None, column: str) -> float | None:
@@ -89,7 +265,12 @@ def build_certification(blocks: dict[StatementType, StatementBlock]) -> pd.DataF
     # 1. Balance sheet equality
     assets_row = _pick_row(balance, r"total assets")
     liab_row = _pick_row(balance, r"total liabilities")
-    equity_row = _pick_row(balance, r"total stockholders[’']? equity|total shareholders[’']? equity")
+    equity_row = _pick_row(balance, r"total\s+(?!liabilities)(?!.*stockholders)(?!.*shareholders).*equity$")
+    if equity_row is None:
+        equity_row = _pick_row(
+            balance,
+            r"total\s+(?!liabilities)(?:.*stockholders[’']?\s+equity|.*shareholders[’']?\s+equity)",
+        )
 
     bs_details: list[str] = []
     bs_pass = True
@@ -113,7 +294,7 @@ def build_certification(blocks: dict[StatementType, StatementBlock]) -> pd.DataF
 
     # 2. Cash roll-through
     begin_row = _pick_row(cash, r"beginning cash and cash equivalents")
-    delta_row = _pick_row(cash, r"^increase")
+    delta_row = _pick_row(cash, r"^(?:increase|decrease)")
     end_row = _pick_row(cash, r"ending cash and cash equivalents")
     cash_bs_row = _pick_row(balance, r"cash and cash equivalents")
 
@@ -146,12 +327,12 @@ def build_certification(blocks: dict[StatementType, StatementBlock]) -> pd.DataF
     rows.append([
         "Cash roll-through (Beg + Δ = End) & tie to BS cash",
         "PASS" if roll_pass else "CHECK",
-        "; ".join(roll_details),
+        "; ".join(roll_details) if roll_details else "Not enough data",
     ])
 
     # 3. Net income link
-    is_net_row = _pick_row(income, r"^net income$")
-    cf_net_row = _pick_row(cash, r"^net income$")
+    is_net_row = _pick_row(income, r"^net income")
+    cf_net_row = _pick_row(cash, r"^net income")
     net_details: list[str] = []
     net_pass = True
     for column in income_columns:
@@ -159,7 +340,15 @@ def build_certification(blocks: dict[StatementType, StatementBlock]) -> pd.DataF
         income_val = _value(is_net_row, column)
         cf_column = cash_with_duration.get(key)
         if cf_column is None:
-            cf_column = cash_by_period.get(_period_signature(column, income_meta.get(column), include_duration=False))
+            candidate = cash_by_period.get(
+                _period_signature(column, income_meta.get(column), include_duration=False)
+            )
+            if candidate is not None:
+                income_duration = (income_meta.get(column) or {}).get("duration", "").lower()
+                cash_duration = (cash_meta.get(candidate) or {}).get("duration", "").lower()
+                if income_duration and cash_duration and income_duration != cash_duration:
+                    candidate = None
+            cf_column = candidate
         cf_val = _value(cf_net_row, cf_column) if cf_column else None
         if None in (income_val, cf_val):
             net_details.append(f"{column}: insufficient data")
@@ -172,7 +361,7 @@ def build_certification(blocks: dict[StatementType, StatementBlock]) -> pd.DataF
     rows.append([
         "Net income link (IS Net income vs CF Net income)",
         "PASS" if net_pass else "CHECK",
-        "; ".join(net_details),
+        "; ".join(net_details) if net_details else "Not enough data",
     ])
 
     # 4. Income statement cross-footing
@@ -186,7 +375,7 @@ def build_certification(blocks: dict[StatementType, StatementBlock]) -> pd.DataF
     opinc_row = _pick_row(income, r"^operating income$")
     other_row = _pick_row(income, r"other income|interest and other income")
     pretax_row = _pick_row(income, r"income before")
-    tax_row = _pick_row(income, r"^provision for income taxes")
+    tax_row = _pick_row(income, r"^provision.*income taxes")
 
     for column in income_columns:
         entries: list[str] = []
@@ -228,6 +417,9 @@ def build_certification(blocks: dict[StatementType, StatementBlock]) -> pd.DataF
 
         if entries:
             cross_details.append(f"{column}: " + ", ".join(entries))
+        else:
+            cross_pass = False
+            cross_details.append(f"{column}: insufficient data")
     rows.append([
         "IS cross-footing (subtotals)",
         "PASS" if cross_pass else "CHECK",
