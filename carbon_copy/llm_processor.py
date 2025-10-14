@@ -97,9 +97,11 @@ class LabelLLMProcessor:
         *,
         pdf_name: str,
         output_dir: str = "out",
+        write_files: bool = True,
     ) -> Dict[str, object]:
-        """Persist a usage summary (JSON + CSV) similar to the original processor."""
-        os.makedirs(output_dir, exist_ok=True)
+        """Summarize usage; optionally persist legacy per-file artifacts."""
+        if write_files:
+            os.makedirs(output_dir, exist_ok=True)
         total_in = self._sum_usage(lambda event: event.input_tokens or 0)
         total_out = self._sum_usage(lambda event: event.output_tokens or 0)
         total_tokens = self._sum_usage(lambda event: event.total_tokens or 0)
@@ -118,21 +120,22 @@ class LabelLLMProcessor:
             },
         }
 
-        stem = os.path.splitext(os.path.basename(pdf_name))[0]
-        with open(os.path.join(output_dir, f"{stem}.usage.json"), "w", encoding="utf-8") as handle:
-            json.dump(bundle, handle, indent=2)
+        if write_files:
+            stem = os.path.splitext(os.path.basename(pdf_name))[0]
+            with open(os.path.join(output_dir, f"{stem}.usage.json"), "w", encoding="utf-8") as handle:
+                json.dump(bundle, handle, indent=2)
 
-        csv_path = os.path.join(output_dir, "usage_summary.csv")
-        write_header = not os.path.exists(csv_path)
-        timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
-        models = ",".join(sorted(set(event.model for event in self._usage_events)))
-        with open(csv_path, "a", encoding="utf-8") as handle:
-            if write_header:
-                handle.write("timestamp,file,events,models,input_tokens,output_tokens,total_tokens,estimated_cost_usd\n")
-            handle.write(
-                f"{timestamp},{pdf_name},{len(self._usage_events)},{models},"
-                f"{total_in},{total_out},{total_tokens},{'' if total_cost is None else total_cost}\n"
-            )
+            csv_path = os.path.join(output_dir, "usage_summary.csv")
+            write_header = not os.path.exists(csv_path)
+            timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
+            models = ",".join(sorted(set(event.model for event in self._usage_events)))
+            with open(csv_path, "a", encoding="utf-8") as handle:
+                if write_header:
+                    handle.write("timestamp,file,events,models,input_tokens,output_tokens,total_tokens,estimated_cost_usd\n")
+                handle.write(
+                    f"{timestamp},{pdf_name},{len(self._usage_events)},{models},"
+                    f"{total_in},{total_out},{total_tokens},{'' if total_cost is None else total_cost}\n"
+                )
         return bundle
 
     # -------------------------------------------------------------- internals --

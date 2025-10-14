@@ -8,7 +8,7 @@ import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -181,18 +181,16 @@ def write_per_file(result: CarbonCopyResult, output_dir: Path) -> Path:
     return output_path
 
 
-def persist_suggestions_log(
+def build_suggestions_entry(
     pdf_path: Path,
     suggestions: Sequence[LabelSuggestion],
     applied: Sequence[LabelSuggestion],
     *,
     dry_run: bool,
     min_confidence: float,
-) -> Optional[Path]:
+) -> Optional[Dict[str, object]]:
     if not suggestions:
         return None
-    out_dir = Path("out")
-    out_dir.mkdir(parents=True, exist_ok=True)
     payload = {
         "pdf": str(pdf_path),
         "dry_run": dry_run,
@@ -202,7 +200,76 @@ def persist_suggestions_log(
         "applied_indices": [item.row_index for item in applied],
         "suggestions": [asdict(item) for item in suggestions],
     }
-    log_path = out_dir / f"{pdf_path.stem}.label_suggestions.json"
+    return payload
+
+
+def persist_combined_suggestions_log(
+    entries: Sequence[Dict[str, object]],
+    *,
+    output_filename: str = "label_suggestions.json",
+) -> Optional[Path]:
+    records = [entry for entry in entries if entry]
+    if not records:
+        return None
+    out_dir = Path("out")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "total_files": len(records),
+        "total_suggestions": sum(entry["total_suggestions"] for entry in records),
+        "total_applied": sum(entry["applied_suggestions"] for entry in records),
+        "files": records,
+    }
+    log_path = out_dir / output_filename
+    with open(log_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, ensure_ascii=False)
+    return log_path
+
+
+def persist_combined_usage_log(
+    entries: Sequence[Dict[str, object]],
+    *,
+    output_filename: str = "usage_summary.json",
+) -> Optional[Path]:
+    records = [entry for entry in entries if entry]
+    if not records:
+        return None
+    out_dir = Path("out")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    total_files = len(records)
+    total_events = sum(len(entry.get("events", [])) for entry in records)
+
+    def _aggregate(field: str) -> int:
+        total = 0
+        for entry in records:
+            totals = entry.get("totals")
+            if isinstance(totals, dict):
+                value = totals.get(field)
+                if isinstance(value, (int, float)):
+                    total += int(value) if isinstance(value, int) else int(value)
+        return total
+
+    aggregate_totals = {
+        "input_tokens": _aggregate("input_tokens"),
+        "output_tokens": _aggregate("output_tokens"),
+        "total_tokens": _aggregate("total_tokens"),
+    }
+    cost_values = []
+    for entry in records:
+        totals = entry.get("totals")
+        if isinstance(totals, dict):
+            cost = totals.get("estimated_cost_usd")
+            if isinstance(cost, (int, float)):
+                cost_values.append(float(cost))
+    aggregate_totals["estimated_cost_usd"] = sum(cost_values) if cost_values else None
+
+    payload = {
+        "total_files": total_files,
+        "total_events": total_events,
+        "totals": aggregate_totals,
+        "files": records,
+    }
+    log_path = out_dir / output_filename
     with open(log_path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, ensure_ascii=False)
     return log_path
@@ -348,6 +415,8 @@ def main(argv: list[str] | None = None) -> int:
                     write_per_file(result, args.per_file_dir or DEFAULT_PER_FILE_DIR)
                 )
 
+        suggestion_entries: List[Dict[str, object]] = []
+        usage_entries: List[Dict[str, object]] = []
         if args.llm_normalize and results:
             llm_model = args.llm_model or os.getenv("OPENAI_LABEL_MODEL", "gpt-4.1-mini")
             min_conf = max(0.0, args.llm_min_confidence)
@@ -374,20 +443,26 @@ def main(argv: list[str] | None = None) -> int:
                         for suggestion in suggestions
                         if suggestion.confidence is None or suggestion.confidence >= min_conf
                     ]
-                log_path = persist_suggestions_log(
+                entry = build_suggestions_entry(
                     result.source_pdf,
                     suggestions,
                     applied,
                     dry_run=args.llm_dry_run,
                     min_confidence=min_conf,
                 )
-                usage = processor.summarize_usage(pdf_name=result.source_pdf.name)
+                if entry:
+                    suggestion_entries.append(entry)
+                usage = processor.summarize_usage(
+                    pdf_name=result.source_pdf.name,
+                    write_files=False,
+                )
+                if usage:
+                    usage_entries.append(usage)
                 total = len(suggestions)
                 applied_count = len(applied) if not args.llm_dry_run else 0
-                log_suffix = f" (log: {log_path})" if log_path else ""
                 print(
                     f"LLM normalization for {result.source_pdf.name}: "
-                    f"suggestions={total}, applied={applied_count}{log_suffix}"
+                    f"suggestions={total}, applied={applied_count}"
                 )
                 totals = usage.get("totals") if isinstance(usage, dict) else None
                 if isinstance(totals, dict):
@@ -400,6 +475,12 @@ def main(argv: list[str] | None = None) -> int:
                         token_fragments.append(f"cost≈${float(cost):.4f}")
                     if token_fragments:
                         print(f"  Usage ({', '.join(token_fragments)})")
+            combined_log_path = persist_combined_suggestions_log(suggestion_entries)
+            if combined_log_path:
+                print(f"Combined suggestions log written to {combined_log_path}")
+            usage_log_path = persist_combined_usage_log(usage_entries)
+            if usage_log_path:
+                print(f"Combined usage log written to {usage_log_path}")
 
         long_table, certification, batch_certification = prepare_long_table(results)
         long_output = args.output or DEFAULT_LONG_OUTPUT

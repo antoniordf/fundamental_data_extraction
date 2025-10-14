@@ -561,6 +561,16 @@ class CarbonCopyExtractor:
             if column not in {"Order Index", "Level", "Line Item (as printed)", "_raw_label"}
         ]
         seen_labels: Dict[str, List[int]] = {}
+        drop_label_fragments = {"activities", "activity"}
+        fragment_merge_rules: Dict[str, List[Tuple[str, ...]]] = {
+            "unconsolidated affiliate": [
+                ("income before income taxes",),
+                ("income before equity in earnings",),
+            ],
+            "affiliate": [
+                ("income before equity in earnings",),
+            ],
+        }
 
         def _dedupe(reasons: List[str]) -> List[str]:
             seen: set[str] = set()
@@ -585,7 +595,7 @@ class CarbonCopyExtractor:
             level = int(row.get("Level", 0))
 
             raw_lower = raw_label.lower()
-            has_values = any(val is not None for val in values)
+            has_values = any(not pd.isna(val) for val in values)
             if not has_values:
                 if "per common" in raw_lower and "net income" in raw_lower:
                     drop_indices.append(idx)
@@ -667,21 +677,26 @@ class CarbonCopyExtractor:
             final_label = adjusted_label
 
             parent_lower = parent_label.lower()
-            if final_label.lower() == "restricted cash":
+            final_label_lower = final_label.lower()
+            if not has_values and final_label_lower in drop_label_fragments:
+                drop_indices.append(idx)
+                continue
+
+            if final_label_lower == "restricted cash":
                 if "current" in parent_lower:
                     final_label = "Restricted cash (current)"
                 elif level == 0:
                     final_label = "Restricted cash (non-current)"
                 frame.at[idx, "Line Item (as printed)"] = final_label
 
-            if final_label.lower() == "long-term debt, related party":
+            if final_label_lower == "long-term debt, related party":
                 final_label = "Long-term debt (related party)"
                 frame.at[idx, "Line Item (as printed)"] = final_label
 
-            if final_label.lower() == "shares outstanding":
+            if final_label_lower == "shares outstanding":
                 reasons = []
 
-            if final_label.lower() == "share":
+            if final_label_lower == "share":
                 final_label = "Net income attributable to Amkor per common share"
                 frame.at[idx, "Line Item (as printed)"] = final_label
 
@@ -720,6 +735,40 @@ class CarbonCopyExtractor:
             for lvl in keys_to_delete:
                 section_stack.pop(lvl, None)
             section_stack[level] = final_label
+
+        # Merge multi-line fragments that carry the numeric values while the parent row is empty.
+        for idx in range(len(frame)):
+            label_lower = str(frame.at[idx, "Line Item (as printed)"]).strip().lower()
+            rules = fragment_merge_rules.get(label_lower)
+            if not rules:
+                continue
+            values = [frame.at[idx, column] for column in value_columns]
+            if not any(not pd.isna(val) for val in values):
+                continue
+            current_level = int(frame.at[idx, "Level"])
+            parent_idx: Optional[int] = None
+            for prev_idx in range(idx - 1, -1, -1):
+                prev_level = int(frame.at[prev_idx, "Level"])
+                if prev_level >= current_level:
+                    continue
+                parent_label_lower = str(frame.at[prev_idx, "Line Item (as printed)"]).strip().lower()
+                matched = False
+                for pattern in rules:
+                    if all(term in parent_label_lower for term in pattern):
+                        matched = True
+                        break
+                if matched:
+                    parent_idx = prev_idx
+                    break
+            if parent_idx is None:
+                continue
+            parent_values = [frame.at[parent_idx, column] for column in value_columns]
+            if any(not pd.isna(val) for val in parent_values):
+                continue
+            for column, value in zip(value_columns, values):
+                frame.at[parent_idx, column] = value
+            if idx not in drop_indices:
+                drop_indices.append(idx)
 
         for indices in seen_labels.values():
             if len(indices) <= 1:
